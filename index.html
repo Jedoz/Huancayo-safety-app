@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Huancayo Safety App</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        
+        body {
+            background: #f0f2f5;
+            max-width: 400px;
+            margin: 0 auto;
+            border: 16px solid #333;
+            border-radius: 40px;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .navbar {
+            display: flex;
+            background: white;
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .nav-btn {
+            flex: 1;
+            padding: 12px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 20px;
+            background: #4A90E2;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .nav-btn.active {
+            background: #2C5AA0;
+        }
+        
+        .content {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .page {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+        }
+        
+        .page.active {
+            display: flex;
+        }
+        
+        .page-header {
+            color: #333;
+            padding: 15px 20px 5px;
+            text-align: center;
+            background: white;
+            margin: 0;
+        }
+        
+        /* MAPA REAL */
+        #map {
+            flex: 1;
+            width: 100%;
+            z-index: 1;
+        }
+        
+        /* LEYENDA DEL MAPA */
+        .map-legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        /* BOTÓN DE PÁNICO */
+        .panic-container {
+            padding: 20px;
+            text-align: center;
+            background: white;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .panic-btn {
+            background: #FF4444;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 25px;
+            font-size: 20px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            margin: 20px 0;
+            box-shadow: 0 8px 20px rgba(255, 68, 68, 0.4);
+            transition: all 0.3s;
+        }
+        
+        .panic-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            text-align: center;
+        }
+        
+        /* PERFIL */
+        .profile-content {
+            padding: 20px;
+            background: white;
+            height: 100%;
+            overflow-y: auto;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: bold;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        
+        .whatsapp-btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        
+        .location-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="navbar">
+            <button class="nav-btn active" onclick="showPage('mapa')">🗺️ Mapa</button>
+            <button class="nav-btn" onclick="showPage('panico')">🚨 Pánico</button>
+            <button class="nav-btn" onclick="showPage('perfil')">👤 Perfil</button>
+        </div>
+        
+        <div class="content">
+            <!-- PÁGINA DEL MAPA -->
+            <div id="mapa" class="page active">
+                <h2 class="page-header">Mapa de Riesgo - Huancayo</h2>
+                <div id="map"></div>
+                <div class="map-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff0000;"></div>
+                        <span>Alto Riesgo</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ffa500;"></div>
+                        <span>Riesgo Medio</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #00ff00;"></div>
+                        <span>Bajo Riesgo</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #0000ff;"></div>
+                        <span>Tu Ubicación</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PÁGINA DE PÁNICO -->
+            <div id="panico" class="page">
+                <h2 class="page-header">🚨 Botón de Pánico</h2>
+                <div class="panic-container">
+                    <div class="success" id="gpsStatus">
+                        ✅ App en línea - GPS debería funcionar
+                    </div>
+                    
+                    <button class="panic-btn" onclick="enviarAlerta()">
+                        🚨 ENVIAR ALERTA DE AUXILIO
+                    </button>
+                    <div class="status" id="status">
+                        Listo para enviar alerta de emergencia
+                    </div>
+                    
+                    <div class="location-info" id="locationInfo">
+                        📍 Ubicación: Presiona el botón para obtener
+                    </div>
+                    
+                    <div style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                        📞 Contacto: Docente - WhatsApp
+                    </div>
+                    
+                    <button class="whatsapp-btn" onclick="abrirWhatsApp()">
+                        📱 Abrir WhatsApp Manualmente
+                    </button>
+                </div>
+            </div>
+            
+            <!-- PÁGINA DE PERFIL -->
+            <div id="perfil" class="page">
+                <h2 class="page-header">👤 Perfil de Usuario</h2>
+                <div class="profile-content">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" id="nombre" value="Edwar - UPeU">
+                    </div>
+                    <div class="form-group">
+                        <label>Número del docente (WhatsApp):</label>
+                        <input type="text" id="numeroDocente" value="+51 999 999 999">
+                        <button onclick="guardarNumero()" style="margin-top: 10px; padding: 8px 15px; background: #4A90E2; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
+                            💾 Guardar Número
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tu ubicación actual:</label>
+                        <div class="location-info">
+                            <div id="currentLocation">Presiona el botón de pánico para probar</div>
+                            <button onclick="obtenerUbicacion()" style="margin-top: 10px; padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
+                                📍 Probar GPS Ahora
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="success">
+                        <strong>✅ App funcionando en:</strong><br>
+                        https://[tu-usuario].github.io/huancayo-safety-app/<br>
+                        <em>El GPS funciona porque está en internet</em>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let mapa;
+        let numeroDocente = "+51 999 999 999";
+        let userLocation = { lat: -12.065, lng: -75.210 };
+        let userMarker;
+
+        const puntosRiesgo = [
+            { lat: -12.065, lng: -75.210, nivel: "alto", nombre: "Centro - Mercado" },
+            { lat: -12.067, lng: -75.212, nivel: "medio", nombre: "Zona Este - Universidades" },
+            { lat: -12.064, lng: -75.214, nivel: "bajo", nombre: "Zona Oeste - Residencial" },
+            { lat: -12.063, lng: -75.209, nivel: "alto", nombre: "Plaza Principal" }
+        ];
+
+        function initMap() {
+            mapa = L.map('map').setView([-12.065, -75.210], 14);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(mapa);
+            
+            puntosRiesgo.forEach(punto => {
+                let color = punto.nivel === "alto" ? "red" : 
+                           punto.nivel === "medio" ? "orange" : "green";
+                
+                L.circleMarker([punto.lat, punto.lng], {
+                    color: color, fillColor: color, fillOpacity: 0.6, radius: 8
+                }).addTo(mapa).bindPopup(`<b>${punto.nombre}</b><br>Nivel: ${punto.nivel.toUpperCase()}`);
+            });
+            
+            userMarker = L.marker([userLocation.lat, userLocation.lng], {
+                icon: L.divIcon({
+                    html: '📍<div style="color: blue; font-weight: bold;">TÚ</div>',
+                    iconSize: [40, 40]
+                })
+            }).addTo(mapa).bindPopup("Tu ubicación actual");
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (pageId === 'mapa' && mapa) {
+                setTimeout(() => mapa.invalidateSize(), 300);
+            }
+        }
+
+        function guardarNumero() {
+            numeroDocente = document.getElementById('numeroDocente').value;
+            localStorage.setItem('numeroDocente', numeroDocente);
+            alert("✅ Número guardado: " + numeroDocente);
+        }
+
+        function obtenerUbicacion() {
+            const locationDiv = document.getElementById('currentLocation');
+            locationDiv.innerHTML = "📍 Obteniendo ubicación...";
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        userMarker.setLatLng([userLocation.lat, userLocation.lng]);
+                        mapa.setView([userLocation.lat, userLocation.lng], 16);
+                        
+                        locationDiv.innerHTML = `✅ GPS FUNCIONA!<br>📍 ${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}`;
+                        document.getElementById('locationInfo').innerHTML = `📍 Ubicación obtenida: ${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}`;
+                        
+                        alert("🎉 ¡GPS FUNCIONANDO! La app está en línea y el GPS funciona perfectamente.");
+                    },
+                    (error) => {
+                        locationDiv.innerHTML = "❌ Error GPS. La app debe estar en internet (GitHub Pages)";
+                        alert("Para que el GPS funcione:\n\n1. Sube esta app a GitHub Pages\n2. Ábrela desde https://tu-usuario.github.io/huancayo-safety-app/\n3. ¡El GPS funcionará!");
+                    },
+                    { timeout: 10000, enableHighAccuracy: true }
+                );
+            }
+        }
+
+        function generarEnlaceGoogleMaps(lat, lng) {
+            return `https://www.google.com/maps?q=${lat},${lng}&z=16`;
+        }
+
+        function abrirWhatsApp() {
+            const nombre = document.getElementById('nombre').value;
+            const enlaceMapa = generarEnlaceGoogleMaps(userLocation.lat, userLocation.lng);
+            
+            const mensaje = `🚨 ALERTA DE EMERGENCIA 🚨
+
+👤 Usuario: ${nombre}
+📍 Ubicación: Huancayo
+📌 Coordenadas: ${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}
+🗺️ Ver en Google Maps: ${enlaceMapa}
+⏰ Hora: ${new Date().toLocaleString()}
+
+¡NECESITO AYUDA INMEDIATA!
+
+_App: Huancayo Safety - UPeU_`;
+            
+            const mensajeCodificado = encodeURIComponent(mensaje);
+            const urlWhatsApp = `https://wa.me/${numeroDocente.replace(/\s/g, '')}?text=${mensajeCodificado}`;
+            
+            window.open(urlWhatsApp, '_blank');
+            
+            // Agregar punto de emergencia en el mapa
+            const emergencyMarker = L.circleMarker([userLocation.lat, userLocation.lng], {
+                color: "#FF0000", fillColor: "#FF0000", fillOpacity: 0.8, radius: 15
+            }).addTo(mapa).bindPopup(`<b>🚨 ALERTA ACTIVA</b><br>${new Date().toLocaleString()}`).openPopup();
+            
+            document.getElementById('status').innerHTML = "✅ Alerta enviada - WhatsApp abierto";
+            document.getElementById('status').style.background = "#D4EDDA";
+        }
+
+        function enviarAlerta() {
+            const status = document.getElementById('status');
+            status.innerHTML = "📍 Obteniendo tu ubicación GPS...";
+            status.style.background = "#FFF3CD";
+            
+            obtenerUbicacion();
+            
+            setTimeout(() => {
+                status.innerHTML = "📱 Preparando mensaje de alerta...";
+                setTimeout(abrirWhatsApp, 2000);
+            }, 3000);
+        }
+
+        // INICIALIZACIÓN
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            
+            const numeroGuardado = localStorage.getItem('numeroDocente');
+            if (numeroGuardado) {
+                document.getElementById('numeroDocente').value = numeroGuardado;
+                numeroDocente = numeroGuardado;
+            }
+            
+            document.getElementById('gpsStatus').innerHTML = "✅ App optimizada para GitHub Pages - GPS funcionará";
+        });
+    </script>
+</body>
+</html>
